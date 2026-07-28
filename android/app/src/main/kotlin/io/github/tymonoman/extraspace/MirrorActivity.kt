@@ -94,18 +94,25 @@ class MirrorActivity : ComponentActivity(), ConnectionManager.Callbacks {
         }
     }
 
-    private fun showStatus(text: String?) = main.post {
-        statusView.text = text ?: ""
-        statusView.visibility = if (text == null) View.GONE else View.VISIBLE
+    /** Safe to call from any thread; hops to the main thread itself. */
+    private fun showStatus(text: String?) {
+        main.post {
+            statusView.text = text ?: ""
+            statusView.visibility = if (text == null) View.GONE else View.VISIBLE
+        }
     }
 
     // ------------------------------------------------------- host callbacks
-    override fun onVideoConfig(width: Int, height: Int, framerate: Int) = main.post {
-        streamWidth = width
-        streamHeight = height
-        decoder?.start(width, height, null)
-        Log.i(TAG, "stream configured ${width}x$height @$framerate")
-    }.let { }
+    // All of these arrive on socket threads, so anything touching a view or the
+    // decoder is posted to the main thread.
+    override fun onVideoConfig(width: Int, height: Int, framerate: Int) {
+        main.post {
+            streamWidth = width
+            streamHeight = height
+            decoder?.start(width, height, null)
+            Log.i(TAG, "stream configured ${width}x$height @$framerate")
+        }
+    }
 
     override fun onVideoFrame(data: ByteArray, length: Int, ptsUs: Long, isConfig: Boolean) {
         // Called on the video thread; MediaCodec is happy to be driven from here
@@ -118,19 +125,22 @@ class MirrorActivity : ComponentActivity(), ConnectionManager.Callbacks {
 
     override fun onCameraControl(
         enabled: Boolean, cameraId: String, width: Int, height: Int, framerate: Int, bitrateKbps: Int,
-    ) = main.post {
-        if (enabled) {
+    ) {
+        main.post {
             camera?.stop()
-            camera = CameraSource(this) { data, length, ptsUs, isConfig, isKey ->
-                connection?.sendCameraFrame(data, length, ptsUs, isConfig, isKey)
-            }.also { it.start(cameraId, width, height, framerate, bitrateKbps) }
-        } else {
-            camera?.stop()
-            camera = null
+            camera = if (enabled) {
+                CameraSource(this) { data, length, ptsUs, isConfig, isKey ->
+                    connection?.sendCameraFrame(data, length, ptsUs, isConfig, isKey)
+                }.also { it.start(cameraId, width, height, framerate, bitrateKbps) }
+            } else {
+                null
+            }
         }
-    }.let { }
+    }
 
-    override fun onConnected() = showStatus(null)
+    override fun onConnected() {
+        showStatus(null)
+    }
 
     override fun onDisconnected(reason: String) {
         Log.w(TAG, "disconnected: $reason")

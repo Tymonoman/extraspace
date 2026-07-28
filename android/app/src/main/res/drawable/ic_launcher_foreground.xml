@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Desktop monitor. Kept inside the 66dp safe zone so the launcher's
+         mask cannot clip it on any device. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,36 L64,36 A3,3 0 0 1 67,39 L67,61 A3,3 0 0 1 64,64 L28,64 A3,3 0 0 1 25,61 L25,39 A3,3 0 0 1 28,36 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,64 L52,64 L54,71 L38,71 Z" />
+
+    <!-- The tablet: the "extra space". Offset and upright to read as a second,
+         portrait-ish display rather than a duplicate of the monitor. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M72,44 L84,44 A2.5,2.5 0 0 1 86.5,46.5 L86.5,69.5 A2.5,2.5 0 0 1 84,72 L72,72 A2.5,2.5 0 0 1 69.5,69.5 L69.5,46.5 A2.5,2.5 0 0 1 72,44 Z" />
+</vector>

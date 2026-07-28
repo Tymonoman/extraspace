@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- GNOME blue 3, so the icon sits naturally next to GNOME's own apps. -->
+    <color name="ic_launcher_background">#1C71D8</color>
+</resources>
