@@ -35,7 +35,10 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     println!("\n  pipewire node id : {}", session.node_id());
-    println!("  consume it with  : gst-launch-1.0 pipewiresrc path={} ! videoconvert ! autovideosink\n", session.node_id());
+    println!(
+        "  consume it with  : gst-launch-1.0 pipewiresrc path={} ! videoconvert ! autovideosink\n",
+        session.node_id()
+    );
     println!("monitors during: {:?}", xs_mutter::list_monitors().await?);
 
     // Prove input injection reaches the compositor: trace a short diagonal on the

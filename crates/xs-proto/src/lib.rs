@@ -306,10 +306,7 @@ mod tests {
     fn header_rejects_foreign_data() {
         let mut buf = [0u8; HEADER_LEN];
         buf[0..4].copy_from_slice(&0xdead_beefu32.to_le_bytes());
-        assert_eq!(
-            Header::decode(&buf),
-            Err(ProtoError::BadMagic(0xdead_beef))
-        );
+        assert_eq!(Header::decode(&buf), Err(ProtoError::BadMagic(0xdead_beef)));
     }
 
     #[test]

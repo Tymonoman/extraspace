@@ -246,7 +246,9 @@ async fn connect(
     events: &broadcast::Sender<Event>,
 ) -> anyhow::Result<Active> {
     let step = |s: &str| {
-        let _ = events.send(Event::State(State::Connecting { step: s.to_string() }));
+        let _ = events.send(Event::State(State::Connecting {
+            step: s.to_string(),
+        }));
     };
 
     step("Looking for your tablet…");
@@ -344,7 +346,10 @@ async fn connect(
         send_camera_control(&control_writer, true, &config.camera_id).await?;
     }
 
-    let controller = Arc::new(Mutex::new(AdaptiveController::new(config.bounds, start_kbps)));
+    let controller = Arc::new(Mutex::new(AdaptiveController::new(
+        config.bounds,
+        start_kbps,
+    )));
     let (bitrate_tx, mut bitrate_rx) = mpsc::unbounded_channel::<u32>();
     // Round-trip latency in microseconds, written by the pong handler and read by
     // the stats handler. Atomic rather than a channel: only the freshest value
@@ -492,8 +497,9 @@ async fn connect(
 
                         // Bitrate measured from bytes actually produced, not the
                         // number we asked the encoder for.
-                        let bitrate_kbps =
-                            ((bytes.saturating_sub(last_bytes)) as f64 * 8.0 / 1000.0 / elapsed) as u32;
+                        let bitrate_kbps = ((bytes.saturating_sub(last_bytes)) as f64 * 8.0
+                            / 1000.0
+                            / elapsed) as u32;
                         last_bytes = bytes;
 
                         let _ = events.send(Event::Stats(Stats {
@@ -542,10 +548,8 @@ async fn connect(
             loop {
                 match camera_reader.read_frame().await {
                     Ok(frame) => {
-                        let is_config =
-                            frame.header.flags & flags::CODEC_CONFIG != 0;
-                        if let Err(e) =
-                            writer.push(&frame.payload, frame.header.pts_us, is_config)
+                        let is_config = frame.header.flags & flags::CODEC_CONFIG != 0;
+                        if let Err(e) = writer.push(&frame.payload, frame.header.pts_us, is_config)
                         {
                             warn!(error = %e, "writing to the virtual camera failed");
                             break;
@@ -689,7 +693,10 @@ mod tests {
     fn starting_bitrate_is_reasonable_and_bounded() {
         let bounds = BitrateBounds::default();
         let kbps = starting_bitrate(1332, 800, 60, bounds);
-        assert!((bounds.min_kbps..=bounds.max_kbps).contains(&kbps), "got {kbps}");
+        assert!(
+            (bounds.min_kbps..=bounds.max_kbps).contains(&kbps),
+            "got {kbps}"
+        );
         // A tiny monitor must not fall below the floor.
         assert_eq!(starting_bitrate(640, 480, 30, bounds), bounds.min_kbps);
         // A huge one must not exceed the ceiling.

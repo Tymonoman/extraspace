@@ -66,6 +66,11 @@ const BAD_SAMPLES_BEFORE_DECREASE: u32 = 2;
 /// Consecutive good samples before probing upwards. Deliberately ~5 seconds.
 const GOOD_SAMPLES_BEFORE_INCREASE: u32 = 10;
 
+// The asymmetry between these two is the whole point of AIMD: backing off must be
+// quicker than recovering, or the bitrate oscillates visibly. Enforced at compile
+// time so a future tuning pass cannot quietly invert it.
+const _: () = assert!(BAD_SAMPLES_BEFORE_DECREASE < GOOD_SAMPLES_BEFORE_INCREASE);
+
 /// Multiplicative decrease factor.
 const DECREASE_FACTOR: f64 = 0.75;
 /// Additive increase step.
@@ -237,13 +242,6 @@ mod tests {
         }
         let t = t0 + Duration::from_secs(60);
         assert_eq!(c.observe(good(), t), Some(11_000));
-    }
-
-    #[test]
-    fn decrease_is_faster_than_increase() {
-        // The asymmetry is the whole point: verify it holds rather than trusting
-        // the constants to stay in the right order.
-        assert!(BAD_SAMPLES_BEFORE_DECREASE < GOOD_SAMPLES_BEFORE_INCREASE);
     }
 
     #[test]

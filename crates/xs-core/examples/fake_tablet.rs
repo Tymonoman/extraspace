@@ -39,7 +39,12 @@ async fn main() -> anyhow::Result<()> {
     let control = TcpListener::bind(("127.0.0.1", ports::CONTROL)).await?;
     let video = TcpListener::bind(("127.0.0.1", ports::VIDEO)).await?;
     let camera = TcpListener::bind(("127.0.0.1", ports::CAMERA)).await?;
-    println!("simulated tablet listening on {}/{}/{}", ports::CONTROL, ports::VIDEO, ports::CAMERA);
+    println!(
+        "simulated tablet listening on {}/{}/{}",
+        ports::CONTROL,
+        ports::VIDEO,
+        ports::CAMERA
+    );
 
     std::env::set_var(xs_transport::FAKE_TABLET_ENV, "1");
     let engine = xs_core::spawn(SessionConfig::default());
@@ -49,7 +54,12 @@ async fn main() -> anyhow::Result<()> {
         while let Ok(event) = events.recv().await {
             match event {
                 Event::State(State::Connecting { step }) => println!("  [host] {step}"),
-                Event::State(State::Streaming { width, height, encoder, .. }) => {
+                Event::State(State::Streaming {
+                    width,
+                    height,
+                    encoder,
+                    ..
+                }) => {
                     println!("  [host] streaming {width}x{height} via {encoder}");
                 }
                 Event::State(State::Failed { message }) => println!("  [host] FAILED: {message}"),
@@ -166,8 +176,17 @@ async fn main() -> anyhow::Result<()> {
 
     control_writer
         .write_frame(
-            Channel::Touch, 0, 0, 0,
-            &TouchEvent { action: TouchAction::Up, slot: 0, x: 0.0, y: 0.0 }.encode(),
+            Channel::Touch,
+            0,
+            0,
+            0,
+            &TouchEvent {
+                action: TouchAction::Up,
+                slot: 0,
+                x: 0.0,
+                y: 0.0,
+            }
+            .encode(),
         )
         .await?;
     control_writer.flush().await?;
@@ -179,18 +198,27 @@ async fn main() -> anyhow::Result<()> {
     let elapsed = started.elapsed().as_secs_f64();
     println!("\n--- simulated tablet results ---");
     match c.first_frame_at {
-        Some(t) => println!("  first video frame   {:.0} ms after start", t.duration_since(started).as_secs_f64() * 1000.0),
+        Some(t) => println!(
+            "  first video frame   {:.0} ms after start",
+            t.duration_since(started).as_secs_f64() * 1000.0
+        ),
         None => println!("  first video frame   NEVER ARRIVED"),
     }
     println!("  video frames        {}", c.frames);
     println!("  keyframes           {}", c.keyframes);
     println!("  bytes received      {}", c.bytes);
-    println!("  effective bitrate   {:.2} Mbps", c.bytes as f64 * 8.0 / 1_000_000.0 / elapsed);
+    println!(
+        "  effective bitrate   {:.2} Mbps",
+        c.bytes as f64 * 8.0 / 1_000_000.0 / elapsed
+    );
     println!("  pings answered      {pongs}");
     println!("  touch events sent   {touches_sent}");
 
     anyhow::ensure!(c.frames > 0, "no video ever reached the tablet");
-    anyhow::ensure!(c.keyframes > 0, "no keyframe: a real tablet could not have started decoding");
+    anyhow::ensure!(
+        c.keyframes > 0,
+        "no keyframe: a real tablet could not have started decoding"
+    );
     anyhow::ensure!(pongs > 0, "host never pinged: latency measurement is dead");
     println!("\n  PASS");
     Ok(())

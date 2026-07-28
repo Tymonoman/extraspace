@@ -34,10 +34,8 @@ pub enum CursorMode {
     default_path = "/org/gnome/Mutter/ScreenCast"
 )]
 pub trait ScreenCast {
-    fn create_session(
-        &self,
-        properties: HashMap<&str, Value<'_>>,
-    ) -> zbus::Result<OwnedObjectPath>;
+    fn create_session(&self, properties: HashMap<&str, Value<'_>>)
+        -> zbus::Result<OwnedObjectPath>;
 
     #[zbus(property)]
     fn version(&self) -> zbus::Result<i32>;
@@ -50,10 +48,8 @@ pub trait ScreenCast {
 pub trait ScreenCastSession {
     /// Creates a monitor with no backing hardware. The monitor does not actually
     /// appear until PipeWire stream negotiation settles on a resolution.
-    fn record_virtual(
-        &self,
-        properties: HashMap<&str, Value<'_>>,
-    ) -> zbus::Result<OwnedObjectPath>;
+    fn record_virtual(&self, properties: HashMap<&str, Value<'_>>)
+        -> zbus::Result<OwnedObjectPath>;
 
     /// Captures an existing physical output, by connector name (e.g. `DP-3`).
     fn record_monitor(

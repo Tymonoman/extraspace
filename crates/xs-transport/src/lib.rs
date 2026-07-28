@@ -127,9 +127,12 @@ impl Transport {
 
         // Forward first: the app needs somewhere to be reached even though it is
         // the one listening.
-        adb.forward(&device.serial, ports::CONTROL, sockets::CONTROL).await?;
-        adb.forward(&device.serial, ports::VIDEO, sockets::VIDEO).await?;
-        adb.forward(&device.serial, ports::CAMERA, sockets::CAMERA).await?;
+        adb.forward(&device.serial, ports::CONTROL, sockets::CONTROL)
+            .await?;
+        adb.forward(&device.serial, ports::VIDEO, sockets::VIDEO)
+            .await?;
+        adb.forward(&device.serial, ports::CAMERA, sockets::CAMERA)
+            .await?;
 
         // Restart the activity so we always talk to a fresh instance rather than
         // one left over from a previous run with stale sockets.
@@ -213,7 +216,11 @@ async fn ensure_app_installed(
             debug!(installed, "companion app is up to date");
         }
         Some(installed) => {
-            info!(installed, bundled = bundled_version, "upgrading companion app");
+            info!(
+                installed,
+                bundled = bundled_version,
+                "upgrading companion app"
+            );
             adb.install(serial, apk).await?;
         }
         None => {

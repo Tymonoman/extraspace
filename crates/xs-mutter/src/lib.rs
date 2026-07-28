@@ -122,7 +122,9 @@ impl Session {
         let remote_desktop = RemoteDesktopProxy::new(&conn)
             .await
             .map_err(|_| Error::NoMutter)?;
-        let screen_cast = ScreenCastProxy::new(&conn).await.map_err(|_| Error::NoMutter)?;
+        let screen_cast = ScreenCastProxy::new(&conn)
+            .await
+            .map_err(|_| Error::NoMutter)?;
 
         let version = screen_cast.version().await?;
         if version < REQUIRED_SCREENCAST_VERSION {
@@ -134,9 +136,16 @@ impl Session {
         let devices = remote_desktop.supported_device_types().await?;
         if devices & DEVICE_TYPE_TOUCHSCREEN == 0 {
             // Not fatal for display-only use, but touch is a headline feature.
-            warn!(devices, "mutter reports no touchscreen support; touch will not work");
+            warn!(
+                devices,
+                "mutter reports no touchscreen support; touch will not work"
+            );
         }
-        debug!(screencast_version = version, device_types = devices, "mutter APIs ready");
+        debug!(
+            screencast_version = version,
+            device_types = devices,
+            "mutter APIs ready"
+        );
 
         // 1. Remote-desktop session, whose id links the screen-cast session to it.
         let rd_path: OwnedObjectPath = remote_desktop.create_session().await?;
@@ -327,13 +336,13 @@ pub async fn list_monitors() -> Result<Vec<String>> {
     // correctly or the whole deserialize fails.
     type MonitorSpec = (String, String, String, String);
     type Mode = (
-        String,                        // mode id
-        i32,                           // width
-        i32,                           // height
-        f64,                           // refresh rate
-        f64,                           // preferred scale
-        Vec<f64>,                      // supported scales
-        HashMap<String, OwnedValue>,   // properties
+        String,                      // mode id
+        i32,                         // width
+        i32,                         // height
+        f64,                         // refresh rate
+        f64,                         // preferred scale
+        Vec<f64>,                    // supported scales
+        HashMap<String, OwnedValue>, // properties
     );
     type Monitor = (MonitorSpec, Vec<Mode>, HashMap<String, OwnedValue>);
     type LogicalMonitor = (

@@ -106,11 +106,17 @@ async fn main() -> anyhow::Result<()> {
     let path = std::env::temp_dir().join("extraspace-capture.h264");
     std::fs::write(&path, &stream)?;
     println!("\n  wrote {} ({} bytes)", path.display(), stream.len());
-    println!("  verify with: ffprobe -v error -show_entries stream=codec_name,width,height {}", path.display());
+    println!(
+        "  verify with: ffprobe -v error -show_entries stream=codec_name,width,height {}",
+        path.display()
+    );
 
     // A capture that produces no frames is the failure this whole example exists
     // to catch, so make it a non-zero exit rather than a line of prose.
     anyhow::ensure!(count > 0, "capture produced no frames at all");
-    anyhow::ensure!(keyframes > 0, "no keyframes: the tablet could never start decoding");
+    anyhow::ensure!(
+        keyframes > 0,
+        "no keyframes: the tablet could never start decoding"
+    );
     Ok(())
 }

@@ -129,7 +129,9 @@ impl VideoPipeline {
             gst::ElementFactory::make("capsfilter")
                 .property("caps", caps)
                 .build()
-                .map_err(|_| Error::ElementMissing { element: "capsfilter" })
+                .map_err(|_| Error::ElementMissing {
+                    element: "capsfilter",
+                })
         };
 
         let src = gst::ElementFactory::make("pipewiresrc")
@@ -137,7 +139,9 @@ impl VideoPipeline {
             // Screen-cast buffers do not carry timestamps useful to us.
             .property("do-timestamp", true)
             .build()
-            .map_err(|_| Error::ElementMissing { element: "pipewiresrc" })?;
+            .map_err(|_| Error::ElementMissing {
+                element: "pipewiresrc",
+            })?;
 
         let rate = make("videorate")?;
 
@@ -148,8 +152,11 @@ impl VideoPipeline {
         )?;
 
         let convert = make("videoconvert")?;
-        let convert_caps =
-            caps_filter(gst::Caps::builder("video/x-raw").field("format", "I420").build())?;
+        let convert_caps = caps_filter(
+            gst::Caps::builder("video/x-raw")
+                .field("format", "I420")
+                .build(),
+        )?;
 
         let encoder_element = encoder.build(config.bitrate_kbps, config.framerate)?;
 
@@ -158,7 +165,9 @@ impl VideoPipeline {
             // reconnect, and without inline headers its decoder cannot start.
             .property("config-interval", -1i32)
             .build()
-            .map_err(|_| Error::ElementMissing { element: "h264parse" })?;
+            .map_err(|_| Error::ElementMissing {
+                element: "h264parse",
+            })?;
 
         let parse_caps = caps_filter(
             gst::Caps::builder("video/x-h264")
@@ -299,7 +308,9 @@ impl VideoPipeline {
     /// Logs asynchronous pipeline errors, which otherwise surface only as a
     /// silently stalled stream.
     fn watch_bus(&self) {
-        let Some(bus) = self.pipeline.bus() else { return };
+        let Some(bus) = self.pipeline.bus() else {
+            return;
+        };
         std::thread::spawn(move || {
             for msg in bus.iter_timed(gst::ClockTime::NONE) {
                 match msg.view() {

@@ -119,17 +119,23 @@ impl V4l2Writer {
         let caps = gst::ElementFactory::make("capsfilter")
             .property(
                 "caps",
-                gst::Caps::builder("video/x-raw").field("format", "YUY2").build(),
+                gst::Caps::builder("video/x-raw")
+                    .field("format", "YUY2")
+                    .build(),
             )
             .build()
-            .map_err(|_| Error::ElementMissing { element: "capsfilter" })?;
+            .map_err(|_| Error::ElementMissing {
+                element: "capsfilter",
+            })?;
 
         let sink = gst::ElementFactory::make("v4l2sink")
             .property("device", device.to_string_lossy().as_ref())
             // The loopback device has no clock of its own to sync against.
             .property("sync", false)
             .build()
-            .map_err(|_| Error::ElementMissing { element: "v4l2sink" })?;
+            .map_err(|_| Error::ElementMissing {
+                element: "v4l2sink",
+            })?;
 
         let elements = [
             source.upcast_ref(),
@@ -187,7 +193,9 @@ impl V4l2Writer {
     }
 
     fn watch_bus(&self) {
-        let Some(bus) = self.pipeline.bus() else { return };
+        let Some(bus) = self.pipeline.bus() else {
+            return;
+        };
         std::thread::spawn(move || {
             for msg in bus.iter_timed(gst::ClockTime::NONE) {
                 match msg.view() {

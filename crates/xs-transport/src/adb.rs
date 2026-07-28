@@ -77,7 +77,9 @@ pub struct Adb {
 impl Adb {
     /// Locates `adb` on `PATH`.
     pub fn find() -> Result<Self> {
-        which("adb").map(|binary| Self { binary }).ok_or(Error::AdbNotFound)
+        which("adb")
+            .map(|binary| Self { binary })
+            .ok_or(Error::AdbNotFound)
     }
 
     /// A handle that points at nothing, for the fake-tablet path where teardown
@@ -131,7 +133,10 @@ impl Adb {
         if let Some(d) = devices.iter().find(|d| d.state == DeviceState::Ready) {
             return Ok(d.clone());
         }
-        if let Some(d) = devices.iter().find(|d| d.state == DeviceState::Unauthorized) {
+        if let Some(d) = devices
+            .iter()
+            .find(|d| d.state == DeviceState::Unauthorized)
+        {
             return Err(Error::Unauthorized(d.display_name()));
         }
         Err(Error::NoDevice)
@@ -184,21 +189,26 @@ impl Adb {
         info!(apk = %path, "installing companion app");
         // -r replace, -g grant runtime permissions (camera), -d allow downgrade
         // so a dev build can replace a newer store build.
-        self.run_on(serial, &["install", "-r", "-g", "-d", &path]).await?;
+        self.run_on(serial, &["install", "-r", "-g", "-d", &path])
+            .await?;
         info!("companion app installed");
         Ok(())
     }
 
     /// Launches an activity, e.g. `io.github.tymonoman.extraspace/.MirrorActivity`.
     pub async fn start_activity(&self, serial: &str, component: &str) -> Result<()> {
-        self.run_on(serial, &["shell", "am", "start", "-n", component]).await?;
+        self.run_on(serial, &["shell", "am", "start", "-n", component])
+            .await?;
         debug!(component, "activity started");
         Ok(())
     }
 
     /// Force-stops the companion app.
     pub async fn force_stop(&self, serial: &str, package: &str) {
-        if let Err(e) = self.run_on(serial, &["shell", "am", "force-stop", package]).await {
+        if let Err(e) = self
+            .run_on(serial, &["shell", "am", "force-stop", package])
+            .await
+        {
             warn!(error = %e, "could not force-stop companion app");
         }
     }
@@ -228,7 +238,11 @@ fn parse_device_line(line: &str) -> Option<Device> {
         .split_whitespace()
         .find_map(|f| f.strip_prefix("model:"))
         .map(str::to_string);
-    Some(Device { serial, state, model })
+    Some(Device {
+        serial,
+        state,
+        model,
+    })
 }
 
 fn which(binary: &str) -> Option<PathBuf> {
@@ -245,10 +259,9 @@ mod tests {
 
     #[test]
     fn parses_a_ready_device() {
-        let d = parse_device_line(
-            "R3CT90XMPLZ       device usb:1-6.1 product:T_Tablet model:T_Tablet",
-        )
-        .unwrap();
+        let d =
+            parse_device_line("R3CT90XMPLZ       device usb:1-6.1 product:T_Tablet model:T_Tablet")
+                .unwrap();
         assert_eq!(d.serial, "R3CT90XMPLZ");
         assert_eq!(d.state, DeviceState::Ready);
         assert_eq!(d.display_name(), "T Tablet");
@@ -257,8 +270,7 @@ mod tests {
     #[test]
     fn parses_the_unauthorized_state_we_actually_hit() {
         // Shape of a real unauthorized line; the serial is anonymised.
-        let d = parse_device_line("R3CT90XMPLZ    unauthorized usb:1-6.1 transport_id:1")
-            .unwrap();
+        let d = parse_device_line("R3CT90XMPLZ    unauthorized usb:1-6.1 transport_id:1").unwrap();
         assert_eq!(d.state, DeviceState::Unauthorized);
         // No model is reported until authorised, so the serial has to do.
         assert_eq!(d.display_name(), "R3CT90XMPLZ");

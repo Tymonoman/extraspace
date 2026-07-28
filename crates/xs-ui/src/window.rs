@@ -16,7 +16,7 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use gtk::glib;
-use xs_core::{Command, DisplayMode, Event, EngineHandle, State, Stats};
+use xs_core::{Command, DisplayMode, EngineHandle, Event, State, Stats};
 
 use crate::config::{scale_index, Config, SCALE_OPTIONS};
 
@@ -61,7 +61,9 @@ pub fn build(app: &adw::Application, engine: EngineHandle, config: Rc<RefCell<Co
         .tooltip_text("Main Menu")
         .build();
 
-    let header = adw::HeaderBar::builder().title_widget(&window_title).build();
+    let header = adw::HeaderBar::builder()
+        .title_widget(&window_title)
+        .build();
     header.pack_end(&menu_button);
 
     let (page, widgets) = build_content(window_title.clone());
@@ -245,7 +247,11 @@ fn wire_controls(widgets: &Rc<Widgets>, engine: &EngineHandle, config: &Rc<RefCe
         widgets.scale_row.set_selected(scale_index(c.scale));
         widgets
             .mode_row
-            .set_selected(if c.display_mode() == DisplayMode::Mirror { 1 } else { 0 });
+            .set_selected(if c.display_mode() == DisplayMode::Mirror {
+                1
+            } else {
+                0
+            });
         widgets.camera_switch.set_active(c.camera_enabled);
         widgets.display_switch.set_active(true);
     }
@@ -286,7 +292,12 @@ fn wire_controls(widgets: &Rc<Widgets>, engine: &EngineHandle, config: &Rc<RefCe
             } else {
                 DisplayMode::Extend
             };
-            config.borrow_mut().mode = if row.selected() == 1 { "mirror" } else { "extend" }.into();
+            config.borrow_mut().mode = if row.selected() == 1 {
+                "mirror"
+            } else {
+                "extend"
+            }
+            .into();
             config.borrow().save();
             engine.send(Command::SetMode(mode));
         });
@@ -405,7 +416,9 @@ fn apply_state(widgets: &Rc<Widgets>, state: &State, _config: &Rc<RefCell<Config
 
         State::Connecting { step } => {
             widgets.window_title.set_subtitle("Connecting…");
-            widgets.status.set_icon_name(Some("content-loading-symbolic"));
+            widgets
+                .status
+                .set_icon_name(Some("content-loading-symbolic"));
             widgets.status.set_title("Connecting");
             widgets.status.set_description(Some(step));
             widgets.status_button.set_visible(false);
@@ -445,7 +458,9 @@ fn apply_stats(widgets: &Rc<Widgets>, stats: &Stats) {
     widgets
         .stat_bitrate
         .set_subtitle(&xs_core::format_bitrate(stats.bitrate_kbps));
-    widgets.stat_fps.set_subtitle(&format!("{:.0} fps", stats.fps));
+    widgets
+        .stat_fps
+        .set_subtitle(&format!("{:.0} fps", stats.fps));
     // Bound to a local: a `format!` temporary inside the call would not outlive it.
     let latency = if stats.latency_ms > 0.0 {
         format!("{:.0} ms", stats.latency_ms)

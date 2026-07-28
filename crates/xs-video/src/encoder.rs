@@ -16,8 +16,8 @@
 //! byte-identical output at 5, 15 and 40 Mbit/s, which makes adaptive control
 //! impossible and pins the link at roughly 48 Mbit/s.
 
-use gstreamer as gst;
 use gst::prelude::*;
+use gstreamer as gst;
 use tracing::{debug, info, warn};
 
 /// An H.264 encoder we know how to drive.
@@ -102,7 +102,10 @@ impl Encoder {
                 .property("gop-size", keyframe_interval_frames(framerate))
                 .build()?,
         };
-        debug!(encoder = self.element_name(), kbps, framerate, "encoder built");
+        debug!(
+            encoder = self.element_name(),
+            kbps, framerate, "encoder built"
+        );
         Ok(element)
     }
 
@@ -124,7 +127,10 @@ fn keyframe_interval_frames(nominal_framerate: u32) -> u32 {
     /// Rate to assume when the screen is mostly static, measured on real hardware.
     const IDLE_FPS: u32 = 12;
     const TARGET_SECONDS: u32 = 2;
-    nominal_framerate.min(IDLE_FPS).saturating_mul(TARGET_SECONDS).max(2)
+    nominal_framerate
+        .min(IDLE_FPS)
+        .saturating_mul(TARGET_SECONDS)
+        .max(2)
 }
 
 #[cfg(test)]

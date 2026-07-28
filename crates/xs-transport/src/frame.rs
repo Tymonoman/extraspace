@@ -179,7 +179,10 @@ mod tests {
         let mut writer = FrameWriter::new(client);
         let mut reader = FrameReader::new(server);
 
-        writer.write_frame(Channel::Control, 4, 0, 7, &[]).await.unwrap();
+        writer
+            .write_frame(Channel::Control, 4, 0, 7, &[])
+            .await
+            .unwrap();
         let frame = reader.read_frame().await.unwrap();
         assert!(frame.payload.is_empty());
         assert_eq!(frame.header.kind, 4);
