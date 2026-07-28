@@ -47,6 +47,28 @@ missing_packages() {
 bold "extraspace setup"
 echo
 
+# Fail early and clearly if we cannot become root. Without this the script gets
+# most of the way through the checks and then dies on the first dnf call with
+# sudo's rather opaque "a terminal is required" message -- which is what happens
+# when this is run from a non-interactive shell, an IDE task, or a tool that has
+# no TTY attached.
+if ((CHECK_ONLY == 0)) && ! sudo -n true 2>/dev/null; then
+  if [[ ! -t 0 ]]; then
+    bad "This needs root, but there is no terminal here to ask for your password."
+    echo
+    echo "  Run it from a normal terminal window instead:"
+    echo "      cd $(dirname "$(dirname "$(readlink -f "$0")")") && ./scripts/setup.sh"
+    echo
+    echo "  Or see what it would do, which needs no privileges at all:"
+    echo "      ./scripts/setup.sh --check"
+    exit 1
+  fi
+  warn "This installs packages and loads a kernel module, so it needs sudo."
+  # Prompt once up front rather than at three separate points later.
+  sudo -v || { bad "Could not authenticate; nothing was changed."; exit 1; }
+  echo
+fi
+
 # ---------------------------------------------------------------- environment
 bold "1. Checking environment"
 if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
