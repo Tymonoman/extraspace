@@ -176,7 +176,20 @@ cargo build --release
 ./target/release/extraspace
 ```
 
-### 4. Use it
+### 4. Add it to your applications
+
+Optional, but you probably want it:
+
+```bash
+./scripts/install.sh
+```
+
+Installs the binary, icon and desktop entry under `~/.local`, so Extraspace
+appears in your app grid and runs from anywhere as `extraspace`. No root needed
+— unlike `setup.sh`, this touches nothing system-wide. Undo it with
+`./scripts/install.sh --uninstall`.
+
+### 5. Use it
 
 Open Extraspace and turn on **Extra Display**. The tablet switches to your
 desktop within about a second, and a new monitor appears in
