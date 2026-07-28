@@ -454,6 +454,19 @@ async fn connect(
                         };
                         last_dropped = total_dropped;
 
+                        // Log the inputs, not just the decision: when the bitrate
+                        // walks somewhere surprising, the only useful question is
+                        // which of the three signals drove it.
+                        debug!(
+                            queue = sample.decode_queue_depth,
+                            drops = sample.dropped_delta,
+                            rtt_ms = sample.rtt.as_millis() as u64,
+                            host_dropped = dropped,
+                            device_dropped = device.frames_dropped,
+                            encoded,
+                            "health sample"
+                        );
+
                         if let Some(new_kbps) = controller.lock().await.observe(sample, now) {
                             info!(new_kbps, "adapting bitrate");
                             let _ = bitrate_tx.send(new_kbps);
@@ -600,11 +613,16 @@ fn monotonic_us() -> u64 {
 /// A sensible opening bitrate, so the first second does not look terrible while
 /// the controller finds its level.
 ///
-/// Roughly 0.1 bits per pixel per frame, which lands near 15 Mbit/s for
-/// 1332x800@60 and scales sensibly either way.
+/// 0.2 bits per pixel per frame. The obvious 0.1 was measured starting a
+/// 1332x800@60 session at 6393 kbit/s -- barely above the 6000 floor, so the
+/// controller had nowhere to go but down and sat there. Screen content is mostly
+/// static and compresses well, but text and sharp edges are exactly what suffers
+/// when you starve it, and USB 2.0 has roughly 15x the headroom needed anyway.
+const BITS_PER_PIXEL_PER_FRAME: f64 = 0.2;
+
 fn starting_bitrate(width: u32, height: u32, framerate: u32, bounds: BitrateBounds) -> u32 {
     let pixels_per_second = width as f64 * height as f64 * framerate as f64;
-    let kbps = (pixels_per_second * 0.1 / 1000.0) as u32;
+    let kbps = (pixels_per_second * BITS_PER_PIXEL_PER_FRAME / 1000.0) as u32;
     kbps.clamp(bounds.min_kbps, bounds.max_kbps)
 }
 

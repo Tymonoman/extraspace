@@ -18,4 +18,3 @@ android/.idea/
 
 # Local
 /scratch
-.cargo-sysroot.env

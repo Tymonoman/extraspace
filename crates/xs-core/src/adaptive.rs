@@ -49,6 +49,17 @@ const QUEUE_DEPTH_GOOD: u32 = 1;
 /// Round trip above this means the link is congested regardless of queue depth.
 const RTT_BAD: Duration = Duration::from_millis(120);
 
+/// Dropped frames per sampling window that are treated as noise rather than
+/// congestion.
+///
+/// Zero was too strict in practice: the encoder's output queue is deliberately
+/// shallow, so at ~55 fps an occasional single drop is normal even on a healthy
+/// link. Treating every one as congestion meant the good-sample streak never
+/// reached the threshold to probe upwards, and a real session sat pinned at the
+/// bitrate floor for its whole lifetime. Anything above this is still congestion;
+/// one or two per window is merely not evidence of health.
+const DROPS_TOLERATED: u64 = 2;
+
 /// Consecutive bad samples before backing off. At 2 Hz this is one second --
 /// long enough to ignore a single hiccup, short enough to fix a real stall.
 const BAD_SAMPLES_BEFORE_DECREASE: u32 = 2;
@@ -101,7 +112,7 @@ impl AdaptiveController {
     /// caller can avoid touching the encoder unnecessarily.
     pub fn observe(&mut self, sample: HealthSample, now: Instant) -> Option<u32> {
         let unhealthy = sample.decode_queue_depth >= QUEUE_DEPTH_BAD
-            || sample.dropped_delta > 0
+            || sample.dropped_delta > DROPS_TOLERATED
             || sample.rtt >= RTT_BAD;
         let healthy = sample.decode_queue_depth <= QUEUE_DEPTH_GOOD
             && sample.dropped_delta == 0
@@ -266,6 +277,41 @@ mod tests {
         // Immediately after a change, further bad news must not compound.
         c.observe(bad(), t0 + Duration::from_secs(2));
         assert_eq!(c.observe(bad(), t0 + Duration::from_millis(2100)), None);
+    }
+
+    #[test]
+    fn an_occasional_dropped_frame_is_not_treated_as_congestion() {
+        // Regression: with a zero tolerance, a single drop per window kept
+        // resetting the good streak, and a real 40s session never rose off the
+        // bitrate floor.
+        let mut c = AdaptiveController::new(BitrateBounds::default(), 12_000);
+        let noisy = HealthSample {
+            decode_queue_depth: 0,
+            dropped_delta: DROPS_TOLERATED,
+            rtt: Duration::from_millis(20),
+        };
+        let t0 = Instant::now();
+        for i in 0..20 {
+            let t = t0 + Duration::from_secs(2 + i);
+            assert!(
+                c.observe(noisy, t).is_none_or(|kbps| kbps >= 12_000),
+                "must not back off on tolerated drops"
+            );
+        }
+        assert_eq!(c.current_kbps(), 12_000, "should have held steady");
+    }
+
+    #[test]
+    fn sustained_heavy_drops_still_back_off() {
+        let mut c = AdaptiveController::new(BitrateBounds::default(), 12_000);
+        let heavy = HealthSample {
+            decode_queue_depth: 0,
+            dropped_delta: DROPS_TOLERATED + 1,
+            rtt: Duration::from_millis(20),
+        };
+        let t0 = Instant::now();
+        c.observe(heavy, t0);
+        assert!(c.observe(heavy, t0 + Duration::from_secs(2)).is_some());
     }
 
     #[test]

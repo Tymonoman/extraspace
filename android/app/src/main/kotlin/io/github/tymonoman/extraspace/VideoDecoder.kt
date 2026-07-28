@@ -6,7 +6,9 @@ import android.os.Build
 import android.util.Log
 import android.view.Surface
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.concurrent.thread
 
 /**
  * Hardware H.264 decode straight onto a [Surface].
@@ -19,17 +21,19 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class VideoDecoder(private val surface: Surface) {
     private var codec: MediaCodec? = null
-    private val bufferInfo = MediaCodec.BufferInfo()
+    @Volatile private var running = false
+    private var drainThread: Thread? = null
 
     /** Codec input queue depth -- the host's main signal that we are falling behind. */
-    @Volatile var queueDepth: Int = 0; private set
+    val queueDepth: Int get() = pendingInputs.get()
     val framesDecoded = AtomicLong(0)
     val framesDropped = AtomicLong(0)
     /** Device-clock microseconds when the most recent frame was released for display. */
     val renderedAtUs = AtomicLong(0)
     val lastFramePtsUs = AtomicLong(0)
 
-    private var pendingInputs = 0
+    /** Frames submitted but not yet released for display. Touched by two threads. */
+    private val pendingInputs = AtomicInteger(0)
 
     fun start(width: Int, height: Int, csd: ByteArray?) {
         stop()
@@ -53,6 +57,12 @@ class VideoDecoder(private val surface: Surface) {
             configure(format, surface, null, 0)
             start()
         }
+        running = true
+        // Output is drained on its own thread rather than piggybacking on input.
+        // Draining only when a new frame arrives means that when the desktop goes
+        // idle -- which, since mutter only sends on damage, is most of the time --
+        // the last frame sits decoded but unrendered until something else changes.
+        drainThread = thread(name = "xs-decode-drain") { drainLoop() }
         Log.i(TAG, "decoder started ${width}x$height low-latency=${Build.VERSION.SDK_INT >= Build.VERSION_CODES.R}")
     }
 
@@ -77,10 +87,8 @@ class VideoDecoder(private val surface: Surface) {
             }
             val flags = if (isConfig) MediaCodec.BUFFER_FLAG_CODEC_CONFIG else 0
             mc.queueInputBuffer(index, 0, length, ptsUs, flags)
-            pendingInputs++
-            queueDepth = pendingInputs
+            pendingInputs.incrementAndGet()
             lastFramePtsUs.set(ptsUs)
-            drainOutput()
             true
         } catch (e: IllegalStateException) {
             Log.e(TAG, "decoder rejected input", e)
@@ -88,40 +96,54 @@ class VideoDecoder(private val surface: Surface) {
         }
     }
 
-    /** Releases everything the codec has finished with, rendering it to the surface. */
-    private fun drainOutput() {
-        val mc = codec ?: return
-        while (true) {
-            val index = mc.dequeueOutputBuffer(bufferInfo, 0)
-            when {
-                index >= 0 -> {
-                    // true = render this frame to the surface now.
-                    mc.releaseOutputBuffer(index, true)
-                    pendingInputs = (pendingInputs - 1).coerceAtLeast(0)
-                    framesDecoded.incrementAndGet()
-                    renderedAtUs.set(System.nanoTime() / 1000)
+    /**
+     * Releases finished frames to the surface as soon as they are ready.
+     *
+     * Blocks on the codec rather than spinning, so an idle desktop costs nothing
+     * while a frame that does arrive is rendered immediately.
+     */
+    private fun drainLoop() {
+        val info = MediaCodec.BufferInfo()
+        while (running) {
+            val mc = codec ?: break
+            try {
+                when (val index = mc.dequeueOutputBuffer(info, DRAIN_TIMEOUT_US)) {
+                    in 0..Int.MAX_VALUE -> {
+                        // true = render this frame to the surface now.
+                        mc.releaseOutputBuffer(index, true)
+                        pendingInputs.updateAndGet { (it - 1).coerceAtLeast(0) }
+                        framesDecoded.incrementAndGet()
+                        renderedAtUs.set(System.nanoTime() / 1000)
+                    }
+                    MediaCodec.INFO_OUTPUT_FORMAT_CHANGED ->
+                        Log.i(TAG, "output format now ${mc.outputFormat}")
+                    else -> {} // INFO_TRY_AGAIN_LATER: nothing ready, loop again
                 }
-                index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    Log.i(TAG, "output format now ${mc.outputFormat}")
-                }
-                else -> break // INFO_TRY_AGAIN_LATER or no output ready
+            } catch (e: IllegalStateException) {
+                if (running) Log.e(TAG, "decoder drain failed", e)
+                break
             }
         }
-        queueDepth = pendingInputs
     }
 
     fun stop() {
+        running = false
+        drainThread?.join(500)
+        drainThread = null
         codec?.let {
             runCatching { it.stop() }
             runCatching { it.release() }
         }
         codec = null
-        pendingInputs = 0
-        queueDepth = 0
+        pendingInputs.set(0)
     }
 
     private companion object {
         const val TAG = "extraspace"
         const val INPUT_TIMEOUT_US = 10_000L
+
+        /// Long enough that an idle desktop does not spin the CPU, short enough
+        /// that shutdown is not noticeably delayed waiting for this to return.
+        const val DRAIN_TIMEOUT_US = 20_000L
     }
 }

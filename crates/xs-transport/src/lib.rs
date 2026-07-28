@@ -136,7 +136,9 @@ impl Transport {
         adb.force_stop(&device.serial, PACKAGE).await;
         adb.start_activity(&device.serial, ACTIVITY).await?;
 
-        let control = connect_with_retry(ports::CONTROL).await?;
+        // Control first, and only once it has actually spoken -- see
+        // `connect_once_listening` for why connecting is not enough.
+        let control = connect_once_listening(ports::CONTROL).await?;
         let video = connect_with_retry(ports::VIDEO).await?;
         let camera = connect_with_retry(ports::CAMERA).await?;
         info!("all three channels connected");
@@ -157,7 +159,7 @@ impl Transport {
     /// `fake_tablet` example to exercise the whole host pipeline on one machine.
     async fn connect_fake() -> Result<Self> {
         info!("{FAKE_TABLET_ENV} is set: connecting to a local stand-in, not a real tablet");
-        let control = connect_with_retry(ports::CONTROL).await?;
+        let control = connect_once_listening(ports::CONTROL).await?;
         let video = connect_with_retry(ports::VIDEO).await?;
         let camera = connect_with_retry(ports::CAMERA).await?;
         Ok(Self {
@@ -222,10 +224,51 @@ async fn ensure_app_installed(
     Ok(())
 }
 
-/// Connects to a forwarded port, retrying while the app finishes starting.
+/// Connects, and does not return until the peer has proven it is really there.
 ///
-/// The forward exists immediately but the app's `LocalServerSocket` does not, so
-/// the first few attempts are expected to fail with connection-refused.
+/// This exists because of a genuinely misleading `adb forward` behaviour: adb
+/// accepts the *local* TCP connection whether or not anything is listening on the
+/// device, and only then tries to open the remote socket. If that fails it simply
+/// closes the connection. So `TcpStream::connect` succeeds on the very first try
+/// even when the companion app has not finished starting, and the failure surfaces
+/// milliseconds later as an unexplained EOF midway through the handshake.
+///
+/// Retrying on connection-refused therefore never fires. The only reliable signal
+/// is bytes: the app writes `Hello` immediately on accept, so we peek for one byte
+/// and treat silence or EOF as "not up yet".
+async fn connect_once_listening(port: u16) -> Result<TcpStream> {
+    /// How long to give the peer to say something before assuming it is a phantom.
+    const PROBE_TIMEOUT: Duration = Duration::from_millis(400);
+
+    let deadline = tokio::time::Instant::now() + CONNECT_TIMEOUT;
+    let mut attempts = 0u32;
+    loop {
+        if let Ok(stream) = TcpStream::connect(("127.0.0.1", port)).await {
+            let _ = stream.set_nodelay(true);
+            let mut probe = [0u8; 1];
+            // peek leaves the byte in the socket buffer for the real reader.
+            match tokio::time::timeout(PROBE_TIMEOUT, stream.peek(&mut probe)).await {
+                Ok(Ok(n)) if n > 0 => {
+                    debug!(port, attempts, "control channel connected and talking");
+                    return Ok(stream);
+                }
+                // n == 0 is EOF: adb's phantom accept. Anything else means the app
+                // is up but silent, which for the control channel also means not ready.
+                _ => {}
+            }
+        }
+        attempts += 1;
+        if tokio::time::Instant::now() >= deadline {
+            return Err(Error::ConnectTimeout { port });
+        }
+        tokio::time::sleep(CONNECT_RETRY_DELAY).await;
+    }
+}
+
+/// Connects to a forwarded port for a channel the peer does not speak on first.
+///
+/// Only safe to use *after* [`connect_once_listening`] has confirmed the app is
+/// running, since it cannot distinguish a real connection from adb's phantom accept.
 async fn connect_with_retry(port: u16) -> Result<TcpStream> {
     let deadline = tokio::time::Instant::now() + CONNECT_TIMEOUT;
     let mut attempts = 0u32;
