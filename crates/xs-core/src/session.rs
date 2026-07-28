@@ -94,6 +94,9 @@ type SharedWriter = Arc<Mutex<FrameWriter<OwnedWriteHalf>>>;
 /// Everything belonging to one live connection.
 struct Active {
     transport: TransportHandle,
+    /// Held open while the camera is off, so the channel survives until the user
+    /// enables it. Closing it would take the whole adb forward down with it.
+    _idle_camera: Option<tokio::net::TcpStream>,
     mutter: Arc<xs_mutter::Session>,
     pipeline: Arc<VideoPipeline>,
     controller: Arc<Mutex<AdaptiveController>>,
@@ -251,9 +254,12 @@ async fn connect(
     let device_name = transport.device.display_name();
     let (handle, control, video, camera) = transport.split();
 
+    // Only the control channel is bidirectional, so only it is split. This is not
+    // tidiness: dropping tokio's `OwnedWriteHalf` calls shutdown(Write), and adb's
+    // forwarder tears down the entire unix socket to the device when either
+    // direction closes. Splitting the camera stream and dropping its write half
+    // therefore killed the channel, and the tablet's very next frame hit EPIPE.
     let (control_rx, control_tx) = control.into_split();
-    let (_video_rx, video_tx) = video.into_split();
-    let (camera_rx, _camera_tx) = camera.into_split();
 
     let mut control_reader = FrameReader::new(control_rx);
     let control_writer: SharedWriter = Arc::new(Mutex::new(FrameWriter::new(control_tx)));
@@ -347,7 +353,7 @@ async fn connect(
     let mut tasks = Vec::new();
 
     // --- video out -------------------------------------------------------
-    let mut video_writer = FrameWriter::new(video_tx);
+    let mut video_writer = FrameWriter::new(video);
     tasks.push(tokio::spawn(async move {
         while let Some(frame) = frames.recv().await {
             let flag = if frame.keyframe { flags::KEYFRAME } else { 0 };
@@ -411,6 +417,18 @@ async fn connect(
                             warn!("malformed touch event");
                             continue;
                         };
+                        // Log the ends of a gesture but not the motion between:
+                        // motion arrives at up to 120 Hz per finger and would
+                        // drown out everything else.
+                        if !matches!(touch.action, TouchAction::Motion) {
+                            debug!(
+                                action = ?touch.action,
+                                slot = touch.slot,
+                                x = touch.x,
+                                y = touch.y,
+                                "touch"
+                            );
+                        }
                         let result = match touch.action {
                             TouchAction::Down => {
                                 mutter.touch_down(touch.slot, touch.x, touch.y).await
@@ -505,9 +523,13 @@ async fn connect(
     }
 
     // --- camera in -------------------------------------------------------
+    // The socket is held either way. Letting it drop when the camera is off would
+    // close the channel, and the tablet would then fail the moment the user turns
+    // the camera on mid-session.
+    let mut idle_camera = None;
     if config.camera_enabled {
         let events = events.clone();
-        let mut camera_reader = FrameReader::new(camera_rx);
+        let mut camera_reader = FrameReader::new(camera);
         tasks.push(tokio::spawn(async move {
             let mut writer = match xs_camera::V4l2Writer::open_default() {
                 Ok(w) => w,
@@ -536,10 +558,13 @@ async fn connect(
                 }
             }
         }));
+    } else {
+        idle_camera = Some(camera);
     }
 
     Ok(Active {
         transport: handle,
+        _idle_camera: idle_camera,
         mutter,
         pipeline,
         controller,
