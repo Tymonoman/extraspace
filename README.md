@@ -53,19 +53,25 @@ maths at all. Extraspace is a well-behaved GNOME app wrapped around those two AP
 
 ## Status
 
-Honest state of things, so nobody wastes an evening:
+Everything below has been run end to end on real hardware — GNOME Shell 50.3
+driving a Telekom T Tablet (Wingtech, Android 15) over USB.
 
 | Piece | State |
 |---|---|
-| Virtual monitor creation, teardown | **Working** — verified on GNOME 50.3 / mutter 50.3 |
-| Touch injection into the virtual monitor | **Working** — verified end to end |
-| Capture → H.264 encode | **Working** — captures the real desktop, output decodes cleanly |
-| Wire protocol, adb transport | **Working** — unit tested |
-| Adaptive bitrate control | **Working** — unit tested |
-| Transport, handshake, adaptive bitrate | **Working** — exercised over real sockets |
-| Tablet-side decode and display | **Written, not yet run on a tablet** |
-| Camera → `/dev/video10` | **Written, not yet run on a tablet** |
+| Virtual monitor creation, teardown | **Working** — appears alongside physical outputs |
+| Capture → H.264 encode | **Working** — 55 fps at 1332×800 via `x264enc` |
+| USB transport, handshake, APK auto-push | **Working** |
+| Tablet-side decode and display | **Working** — MediaCodec, `low-latency=true` |
+| Touch → cursor on the virtual monitor | **Working** — coordinates map exactly |
+| Adaptive bitrate control | **Working** — queue 0, RTT ~1 ms, probes upward |
+| Camera → `/dev/video10` | **Working** — 1920×1080 in any V4L2 app |
 | Keyboard, stylus, audio, Wi-Fi | Not started — see [Roadmap](#roadmap) |
+
+Measured on that setup: first frame **47 ms** after start, round trip **~1 ms**
+over USB, decoder input queue steady at **0**.
+
+This is a v0.1 that has been made to work on exactly one tablet and one GNOME
+version. Reports from other hardware are the most useful thing you can send.
 
 ### Verifying it without a tablet
 
@@ -223,6 +229,24 @@ Things that cost time, recorded so they cost you less:
 - **USB 2.0 is not the bottleneck.** Raw 2000×1200@60 would need ~550 MB/s, far
   beyond the ~30 MB/s a High Speed link gives you. Encoded H.264 at 15 Mbit/s is
   under 2 MB/s — roughly 15× headroom.
+- **`adb forward` accepts connections to nothing.** adb accepts the *local* TCP
+  connection whether or not anything is listening on the device, then closes it
+  once the remote open fails. So `connect()` succeeds on the first attempt even
+  when the companion app has not started, and the failure appears milliseconds
+  later as an unexplained EOF mid-handshake. Retrying on connection-refused never
+  helps, because connection-refused never happens. The only reliable readiness
+  signal is bytes.
+- **Half-closing one direction kills the whole channel.** Tokio's
+  `OwnedWriteHalf` calls `shutdown(Write)` when dropped, and adb's forwarder tears
+  down the entire unix socket to the device when either direction closes. Splitting
+  a read-only stream and dropping the unused write half is therefore fatal — the
+  peer's next write gets EPIPE. Streams used one way are not split at all here.
+- **Draining MediaCodec only when input arrives loses the last frame.** Because
+  mutter sends only on damage, an idle desktop delivers nothing for seconds at a
+  time; if output is drained inside the input path, the final frame stays decoded
+  but unrendered until something else changes. A dedicated drain thread fixed both
+  that and the queue-depth telemetry, which had been reporting a stuck 6–8 and
+  driving the bitrate to the floor for entire sessions.
 - **"60 fps" is a ceiling, not a rate.** Mutter only emits a frame when something
   on the monitor actually changes, so a still desktop measures around **11 fps**
   and well under 1 Mbit/s. That is exactly what you want — an idle screen should
