@@ -246,22 +246,22 @@ mod tests {
     #[test]
     fn parses_a_ready_device() {
         let d = parse_device_line(
-            "BP98109BA1481600539       device usb:1-6.1 product:T_Tablet model:T_Tablet",
+            "R3CT90XMPLZ       device usb:1-6.1 product:T_Tablet model:T_Tablet",
         )
         .unwrap();
-        assert_eq!(d.serial, "BP98109BA1481600539");
+        assert_eq!(d.serial, "R3CT90XMPLZ");
         assert_eq!(d.state, DeviceState::Ready);
         assert_eq!(d.display_name(), "T Tablet");
     }
 
     #[test]
     fn parses_the_unauthorized_state_we_actually_hit() {
-        // Exactly what this tablet reported before the trust prompt was accepted.
-        let d = parse_device_line("BP98109BA1481600539    unauthorized usb:1-6.1 transport_id:1")
+        // Shape of a real unauthorized line; the serial is anonymised.
+        let d = parse_device_line("R3CT90XMPLZ    unauthorized usb:1-6.1 transport_id:1")
             .unwrap();
         assert_eq!(d.state, DeviceState::Unauthorized);
         // No model is reported until authorised, so the serial has to do.
-        assert_eq!(d.display_name(), "BP98109BA1481600539");
+        assert_eq!(d.display_name(), "R3CT90XMPLZ");
     }
 
     #[test]
