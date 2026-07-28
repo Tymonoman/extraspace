@@ -80,6 +80,15 @@ impl Adb {
         which("adb").map(|binary| Self { binary }).ok_or(Error::AdbNotFound)
     }
 
+    /// A handle that points at nothing, for the fake-tablet path where teardown
+    /// has no forwards to remove. Every command against it simply fails, which
+    /// the teardown path already treats as non-fatal.
+    pub fn none() -> Self {
+        Self {
+            binary: PathBuf::from("/nonexistent/adb"),
+        }
+    }
+
     async fn run(&self, args: &[&str]) -> Result<String> {
         debug!(args = ?args, "adb");
         let output = Command::new(&self.binary)

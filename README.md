@@ -62,28 +62,50 @@ Honest state of things, so nobody wastes an evening:
 | Capture → H.264 encode | **Working** — captures the real desktop, output decodes cleanly |
 | Wire protocol, adb transport | **Working** — unit tested |
 | Adaptive bitrate control | **Working** — unit tested |
+| Transport, handshake, adaptive bitrate | **Working** — exercised over real sockets |
 | Tablet-side decode and display | **Written, not yet run on a tablet** |
 | Camera → `/dev/video10` | **Written, not yet run on a tablet** |
 | Keyboard, stylus, audio, Wi-Fi | Not started — see [Roadmap](#roadmap) |
 
-You can verify the capture half yourself, with no tablet plugged in:
+### Verifying it without a tablet
+
+Everything above the tablet's decoder can be exercised on one machine, which is
+also how you develop this if you do not have an Android device to hand.
+
+**The whole host pipeline, against a simulated tablet:**
+
+```console
+$ cargo run -p xs-core --example fake_tablet
+simulated tablet listening on 27183/27184/27185
+  [tablet] sent Hello (2000x1200)
+  [host] Creating the display…
+  [host] streaming 1332x800 via OpenH264 (software, fallback)
+  adapting bitrate new_kbps=7393
+  adapting bitrate new_kbps=8393
+
+--- simulated tablet results ---
+  first video frame   152 ms after start
+  video frames        57
+  keyframes           3
+  pings answered      20
+  touch events sent   21
+
+  PASS
+```
+
+That covers session orchestration, the handshake, virtual monitor creation,
+capture, encoding, framing over real sockets, touch injection into the
+compositor, and the adaptive controller probing upward on healthy samples. It
+does not cover MediaCodec or anything USB-specific.
+
+**Just the capture half, writing a file you can inspect:**
 
 ```console
 $ cargo run -p xs-video --example capture_test
-creating a 1332x800@60 virtual monitor...
-  pipewire node 92
-  encoder: OpenH264 (software, fallback)
-
-capturing for 5s...
---- results ---
-  first frame after   46 ms
-  frames              57
-  keyframes           3
-  measured rate       11.4 fps  (asked for 60)
 ```
 
-It writes `/tmp/extraspace-capture.h264`, which `ffprobe` will confirm is
-Constrained Baseline 1332×800 that decodes without errors.
+It writes `/tmp/extraspace-capture.h264` — `ffprobe` confirms Constrained
+Baseline 1332×800, and `ffmpeg -i … -f null -` decodes every frame without error.
 
 If you try it and something breaks, an issue with `RUST_LOG=debug` output is very
 welcome.

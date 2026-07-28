@@ -24,3 +24,6 @@ serde_json = "1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+
+[dev-dependencies.tracing-subscriber]
+workspace = true

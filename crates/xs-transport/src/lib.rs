@@ -66,6 +66,7 @@ pub struct Transport {
     pub video: TcpStream,
     pub camera: TcpStream,
     adb: Adb,
+    simulated: bool,
 }
 
 /// The teardown half of a [`Transport`], kept after the sockets are handed out.
@@ -75,17 +76,35 @@ pub struct Transport {
 pub struct TransportHandle {
     pub device: Device,
     adb: Adb,
+    /// True for the fake-tablet path, where there is nothing for adb to undo.
+    simulated: bool,
 }
 
 impl TransportHandle {
     /// Removes the port forwards and stops the companion app.
     pub async fn disconnect(&self) {
+        if self.simulated {
+            debug!("simulated transport: nothing to tear down");
+            return;
+        }
         for port in [ports::CONTROL, ports::VIDEO, ports::CAMERA] {
             self.adb.remove_forward(&self.device.serial, port).await;
         }
         self.adb.force_stop(&self.device.serial, PACKAGE).await;
         debug!("transport torn down");
     }
+}
+
+/// Environment variable that swaps the real tablet for anything listening on the
+/// three ports locally.
+///
+/// This exists so the host can be developed and tested without hardware --
+/// see `cargo run -p xs-core --example fake_tablet`. It is checked at connect
+/// time rather than behind a cargo feature so a release build can still use it.
+pub const FAKE_TABLET_ENV: &str = "EXTRASPACE_FAKE_TABLET";
+
+fn fake_tablet_requested() -> bool {
+    std::env::var_os(FAKE_TABLET_ENV).is_some_and(|v| v != "0" && !v.is_empty())
 }
 
 impl Transport {
@@ -95,6 +114,9 @@ impl Transport {
     /// `apk` is optional -- when present and newer than what is installed, it is
     /// pushed automatically so the app and host can never drift out of sync.
     pub async fn connect(apk: Option<&Path>, apk_version: u32) -> Result<Self> {
+        if fake_tablet_requested() {
+            return Self::connect_fake().await;
+        }
         let adb = Adb::find()?;
         let device = adb.require_device().await?;
         info!(device = %device.display_name(), serial = %device.serial, "tablet found");
@@ -125,6 +147,30 @@ impl Transport {
             video,
             camera,
             adb,
+            simulated: false,
+        })
+    }
+
+    /// Connects to a stand-in tablet already listening on the three ports.
+    ///
+    /// No adb, no device, no APK -- just three TCP connections. Used by the
+    /// `fake_tablet` example to exercise the whole host pipeline on one machine.
+    async fn connect_fake() -> Result<Self> {
+        info!("{FAKE_TABLET_ENV} is set: connecting to a local stand-in, not a real tablet");
+        let control = connect_with_retry(ports::CONTROL).await?;
+        let video = connect_with_retry(ports::VIDEO).await?;
+        let camera = connect_with_retry(ports::CAMERA).await?;
+        Ok(Self {
+            device: Device {
+                serial: "fake".into(),
+                state: DeviceState::Ready,
+                model: Some("Simulated_Tablet".into()),
+            },
+            control,
+            video,
+            camera,
+            adb: Adb::find().unwrap_or_else(|_| Adb::none()),
+            simulated: true,
         })
     }
 
@@ -135,6 +181,7 @@ impl Transport {
             TransportHandle {
                 device: self.device,
                 adb: self.adb,
+                simulated: self.simulated,
             },
             self.control,
             self.video,

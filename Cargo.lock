@@ -1492,6 +1492,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "xs-camera",
  "xs-mutter",
  "xs-proto",
