@@ -1,0 +1,27 @@
+[package]
+name = "xs-ui"
+description = "GTK4/libadwaita front end for extraspace"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "extraspace"
+path = "src/main.rs"
+
+[dependencies]
+xs-core.workspace = true
+xs-camera.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json = "1"
+gstreamer.workspace = true
+# Aliased so the code reads `gtk::` and `adw::`, matching every GTK example
+# and the C API docs.
+gtk = { version = "0.10", package = "gtk4" }
+adw = { version = "0.8", package = "libadwaita", features = ["v1_5"] }

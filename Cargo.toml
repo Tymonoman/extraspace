@@ -1,0 +1,54 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/xs-proto",
+    "crates/xs-mutter",
+    "crates/xs-video",
+    "crates/xs-transport",
+    "crates/xs-camera",
+    "crates/xs-core",
+    "crates/xs-ui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Tymonoman/extraspace"
+homepage = "https://github.com/Tymonoman/extraspace"
+authors = ["Tymonoman"]
+
+[workspace.dependencies]
+xs-proto = { path = "crates/xs-proto" }
+xs-mutter = { path = "crates/xs-mutter" }
+xs-video = { path = "crates/xs-video" }
+xs-transport = { path = "crates/xs-transport" }
+xs-camera = { path = "crates/xs-camera" }
+xs-core = { path = "crates/xs-core" }
+
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "process"] }
+futures-util = "0.3"
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+zvariant = "5"
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+gstreamer = "0.24"
+gstreamer-app = "0.24"
+gstreamer-video = "0.24"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# The capture -> encode path runs every frame; never ship it unoptimised even in dev builds.
+[profile.dev.package.gstreamer]
+opt-level = 2
+[profile.dev.package.xs-video]
+opt-level = 2

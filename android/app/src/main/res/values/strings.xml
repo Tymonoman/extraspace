@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Extraspace</string>
+    <string name="waiting_for_host">Waiting for your computer…\n\nKeep this screen open and start Extraspace on your desktop.</string>
+    <string name="disconnected">Disconnected: %1$s</string>
+</resources>

@@ -1,0 +1,15 @@
+[package]
+name = "xs-camera"
+description = "Writes the tablet camera stream into a v4l2loopback device"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+gstreamer.workspace = true
+gstreamer-app.workspace = true

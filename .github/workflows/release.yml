@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build companion APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      # Named without a version so the download URL in the README stays valid
+      # across releases and the host's APK lookup does not need updating.
+      - name: Stage artifacts
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/*.apk dist/extraspace.apk
+          ls -la dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/extraspace.apk
+          generate_release_notes: true
+          body: |
+            ## Installing
+
+            1. Download `extraspace.apk` below.
+            2. Build and run the desktop app:
+
+               ```bash
+               ./scripts/setup.sh
+               cargo build --release
+               EXTRASPACE_APK=~/Downloads/extraspace.apk ./target/release/extraspace
+               ```
+
+            The host installs and upgrades the companion app over adb from then on.

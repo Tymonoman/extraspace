@@ -1,0 +1,22 @@
+[package]
+name = "xs-mutter"
+description = "Virtual monitor and input injection via mutter's private D-Bus API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+futures-util.workspace = true
+zbus.workspace = true
+zvariant.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tracing-subscriber.workspace = true
+anyhow.workspace = true
