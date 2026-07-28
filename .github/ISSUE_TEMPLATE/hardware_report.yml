@@ -1,0 +1,78 @@
+name: It worked (or half worked) on my hardware
+description: Report a tablet or GNOME version that is not the one this was built on
+labels: [hardware-report]
+title: "Hardware report: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Extraspace has only ever been proven on one tablet and one GNOME
+        version, so every data point from elsewhere is worth having — including
+        the boring "it just worked" ones, which are the hardest to find out
+        about and the most reassuring to everyone else.
+
+        Partial successes are especially welcome. "Display fine, camera dead"
+        is far more useful than silence.
+
+  - type: input
+    id: tablet
+    attributes:
+      label: Tablet
+      placeholder: e.g. Lenovo Tab P11, Android 13, 2000x1200
+    validations:
+      required: true
+
+  - type: input
+    id: desktop
+    attributes:
+      label: GNOME version and distribution
+      placeholder: e.g. GNOME 48, Ubuntu 25.04
+    validations:
+      required: true
+
+  - type: dropdown
+    id: display
+    attributes:
+      label: Extra display
+      options:
+        - Works
+        - Works with problems
+        - Does not work
+        - Did not try
+    validations:
+      required: true
+
+  - type: dropdown
+    id: touch
+    attributes:
+      label: Touch input
+      options:
+        - Works
+        - Works with problems
+        - Does not work
+        - Did not try
+    validations:
+      required: true
+
+  - type: dropdown
+    id: camera
+    attributes:
+      label: Camera passthrough
+      options:
+        - Works
+        - Works with problems
+        - Does not work
+        - Did not try
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything worth noting
+      description: |
+        Measured latency, encoder chosen, anything that needed changing to make
+        it work. If a setting had to be different from the default, that is the
+        most useful thing here.
+    validations:
+      required: false

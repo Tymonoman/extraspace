@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Does it work on your tablet?
+    url: https://github.com/Tymonoman/extraspace/issues/new?template=hardware_report.yml
+    about: Report a tablet or GNOME version this has not been tried on

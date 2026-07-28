@@ -1,0 +1,71 @@
+name: Bug report
+description: Something does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Extraspace is verified on exactly one tablet and one GNOME version, so
+        a report from different hardware is genuinely useful rather than a
+        chore. Thank you for taking the time.
+
+        The single most useful thing you can paste is the output of
+        `./scripts/setup.sh --check` — it captures your whole environment at
+        once and changes nothing.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output of `./scripts/setup.sh --check`
+      render: shell
+      placeholder: |
+        $ ./scripts/setup.sh --check
+    validations:
+      required: true
+
+  - type: input
+    id: tablet
+    attributes:
+      label: Tablet
+      description: Model and Android version
+      placeholder: e.g. Samsung Galaxy Tab A8, Android 13
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: host-log
+    attributes:
+      label: Host log
+      description: |
+        Output of `RUST_LOG=debug ./target/release/extraspace`.
+        Feel free to trim it — the last 40 lines before the failure are usually
+        enough, and the interesting part is normally near the end.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: tablet-log
+    attributes:
+      label: Tablet log
+      description: Output of `adb logcat -d -s extraspace:V`
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before filing
+      options:
+        - label: "`adb devices` shows my tablet as `device`, not `unauthorized`"
+        - label: I tried a different USB cable (a surprising number are charge-only)
