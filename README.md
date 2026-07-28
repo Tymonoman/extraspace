@@ -125,53 +125,75 @@ welcome.
 - A **USB cable** and USB debugging enabled on the tablet.
 - Any GPU. Encoding is done on the CPU by default and needs roughly one core.
 
-## Install
+## Getting started
+
+Four steps, once. After that it is plug in the cable and open the app.
+
+### 1. Turn on USB debugging, on the tablet
+
+This is the step everyone forgets, and it is why most first runs fail.
+
+1. **Settings → About tablet** → tap **Build number** seven times.
+2. **Settings → System → Developer options** → turn on **USB debugging**.
+3. Plug in the USB cable. Accept the *Allow USB debugging?* prompt,
+   ticking **Always allow from this computer**.
+
+Skip step 3 and Extraspace will tell you exactly that, by name, rather than
+failing with something cryptic.
+
+> A surprising number of USB cables are charge-only and carry no data. If your
+> tablet charges but never appears, try a different cable before anything else.
+
+### 2. Set up the computer
 
 ```bash
 git clone https://github.com/Tymonoman/extraspace
 cd extraspace
-./scripts/setup.sh      # installs dependencies, creates /dev/video10
-cargo build --release
-./target/release/extraspace
+./scripts/setup.sh
 ```
 
-`setup.sh` is the only step that needs `sudo`. It installs the GStreamer and GTK
-development packages, sets up the virtual camera device so it survives reboots,
-and tells you whether your tablet is visible. Run it with `--check` to see what it
-would do without changing anything.
+This is the only step that needs `sudo`. It installs the GStreamer and GTK
+packages, creates `/dev/video10` for the camera so it survives reboots, and
+reports whether your tablet is visible. Run `./scripts/setup.sh --check` first if
+you would rather see what it intends to do — that needs no privileges at all.
 
-You will also need the companion app on the tablet. Grab `extraspace.apk` from the
-[latest release](https://github.com/Tymonoman/extraspace/releases) and either
-sideload it, or just let Extraspace push it for you:
+### 3. Get the companion app onto the tablet
+
+Download `extraspace.apk` from the
+[latest release](https://github.com/Tymonoman/extraspace/releases), then point
+Extraspace at it once:
 
 ```bash
 EXTRASPACE_APK=~/Downloads/extraspace.apk cargo run --release
 ```
 
-Once an APK is on the tablet, the host checks its version on every connect and
-upgrades it automatically, so the two halves can never drift apart.
+It installs the app over USB for you — you never touch the tablet. From then on
+the host checks the installed version on every connect and upgrades it silently,
+so the two halves cannot drift apart, and you can drop the variable:
 
-### Enabling USB debugging
+```bash
+cargo build --release
+./target/release/extraspace
+```
 
-On the tablet:
+### 4. Use it
 
-1. **Settings → About tablet** → tap **Build number** seven times.
-2. **Settings → System → Developer options** → turn on **USB debugging**.
-3. Plug in the USB cable, then accept the *Allow USB debugging?* prompt.
-   Tick **Always allow from this computer**.
-
-If you skip step 3 the app will tell you so explicitly rather than failing with
-something cryptic — it is by far the most common first-run problem.
+Open Extraspace and turn on **Extra Display**. The tablet switches to your
+desktop within about a second, and a new monitor appears in
+**Settings → Displays** that you can drag into position like any other.
 
 ## Usage
-
-Open Extraspace and turn on **Extra Display**. That is the whole workflow.
 
 | Setting | What it does |
 |---|---|
 | **Mode** | *Extend* adds a new monitor. *Mirror* copies an existing one. |
 | **Scale** | How large the desktop is drawn on the tablet. See below. |
 | **Tablet Camera** | Feeds the tablet camera into `/dev/video10`. |
+
+The camera appears as **“Extraspace Tablet Camera”** in Firefox, Zoom, OBS,
+Cheese and anything else that reads a webcam. It only shows up in those lists
+while Extraspace is actually running, so it does not clutter your camera picker
+the rest of the time.
 
 ### About scale
 
