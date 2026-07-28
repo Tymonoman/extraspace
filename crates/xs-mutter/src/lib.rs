@@ -24,8 +24,10 @@ use tracing::{debug, info, warn};
 use zbus::Connection;
 use zvariant::{OwnedObjectPath, Value};
 
+pub mod keys;
 mod proxies;
 
+pub use keys::Chord;
 pub use proxies::CursorMode;
 use proxies::{
     RemoteDesktopProxy, RemoteDesktopSessionProxy, ScreenCastProxy, ScreenCastSessionProxy,
@@ -305,6 +307,62 @@ impl Drop for Session {
         // Best effort: we cannot await here. Dropping the connection also makes
         // mutter reap the session, so the monitor does go away either way.
         debug!("Session dropped without close(); relying on peer disconnect");
+    }
+}
+
+/// A remote-desktop session with no screen cast attached, for injecting input
+/// into the session at large.
+///
+/// Keyboard and relative-pointer events are global rather than stream-relative,
+/// so they need no virtual monitor. That makes this usable alongside a running
+/// [`Session`] instead of competing with it for an output.
+pub struct InputOnlySession {
+    _conn: Connection,
+    session: RemoteDesktopSessionProxy<'static>,
+    stopped: std::sync::atomic::AtomicBool,
+}
+
+impl InputOnlySession {
+    pub async fn open() -> Result<Self> {
+        let conn = Connection::session().await?;
+        let remote_desktop = RemoteDesktopProxy::new(&conn)
+            .await
+            .map_err(|_| Error::NoMutter)?;
+        let path = remote_desktop.create_session().await?;
+        let session = RemoteDesktopSessionProxy::new(&conn, path).await?;
+        session.start().await?;
+        Ok(Self {
+            _conn: conn,
+            session,
+            stopped: std::sync::atomic::AtomicBool::new(false),
+        })
+    }
+
+    /// Presses the modifiers, taps the key, then releases in reverse order.
+    pub async fn send_chord(&self, chord: &Chord) -> Result<()> {
+        for m in &chord.modifiers {
+            self.session.notify_keyboard_keycode(*m, true).await?;
+        }
+        self.session
+            .notify_keyboard_keycode(chord.key, true)
+            .await?;
+        self.session
+            .notify_keyboard_keycode(chord.key, false)
+            .await?;
+        // Reverse order on release, mirroring how a human lets go of a chord.
+        for m in chord.modifiers.iter().rev() {
+            self.session.notify_keyboard_keycode(*m, false).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn close(&self) -> Result<()> {
+        use std::sync::atomic::Ordering;
+        if self.stopped.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+        self.session.stop().await?;
+        Ok(())
     }
 }
 

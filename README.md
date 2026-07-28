@@ -4,10 +4,16 @@
 
 **Turn an Android tablet into a real second monitor for GNOME — over USB, with touch.**
 
+[![CI](https://github.com/Tymonoman/extraspace/actions/workflows/ci.yml/badge.svg)](https://github.com/Tymonoman/extraspace/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![GNOME](https://img.shields.io/badge/GNOME-46%2B-4A86CF.svg)](https://www.gnome.org)
 [![Wayland](https://img.shields.io/badge/Wayland-native-green.svg)](https://wayland.freedesktop.org)
+
+![Extraspace running on an Android tablet](assets/demo.gif)
+
+<sub>Recorded on the tablet itself. That is a GNOME monitor, not a screenshot —
+running over a USB cable, at ~1 ms round trip.</sub>
 
 </div>
 
