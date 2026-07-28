@@ -87,15 +87,19 @@ impl Encoder {
                 .property_from_str("speed-preset", "veryfast")
                 // Annex-B, so the tablet can feed bytes straight to MediaCodec.
                 .property_from_str("byte-stream", "true")
-                // A keyframe every 2s bounds recovery time after a packet loss
-                // without spending much bitrate.
-                .property("key-int-max", framerate.saturating_mul(2))
+                // Keyframe interval is counted in *frames*, and an idle desktop
+                // only produces ~11 fps, so a naive framerate*2 can mean ten
+                // seconds between keyframes -- and a tablet that reconnects
+                // stares at a black screen until the next one. Sized against the
+                // idle rate instead, and the session explicitly asks for a
+                // keyframe whenever a tablet attaches.
+                .property("key-int-max", keyframe_interval_frames(framerate))
                 .build()?,
             Self::OpenH264 => e
                 .property("bitrate", self.bitrate_property_value(kbps))
                 .property_from_str("rate-control", "bitrate")
                 .property_from_str("complexity", "low")
-                .property("gop-size", framerate.saturating_mul(2))
+                .property("gop-size", keyframe_interval_frames(framerate))
                 .build()?,
         };
         debug!(encoder = self.element_name(), kbps, framerate, "encoder built");
@@ -107,6 +111,20 @@ impl Encoder {
     pub fn set_bitrate(self, element: &gst::Element, kbps: u32) {
         element.set_property("bitrate", self.bitrate_property_value(kbps));
     }
+}
+
+/// Keyframe interval, in frames, targeting roughly two seconds of *wall clock*.
+///
+/// Both encoders count this in frames, but the real frame rate depends entirely
+/// on how much of the screen is changing: measured at ~11 fps on a still desktop
+/// versus the nominal 60. Sizing against the nominal rate would mean a keyframe
+/// only every ten seconds while idle, which is exactly when a tablet is most
+/// likely to attach and need one.
+fn keyframe_interval_frames(nominal_framerate: u32) -> u32 {
+    /// Rate to assume when the screen is mostly static, measured on real hardware.
+    const IDLE_FPS: u32 = 12;
+    const TARGET_SECONDS: u32 = 2;
+    nominal_framerate.min(IDLE_FPS).saturating_mul(TARGET_SECONDS).max(2)
 }
 
 #[cfg(test)]
@@ -128,5 +146,22 @@ mod tests {
     #[test]
     fn x264_is_preferred_over_openh264() {
         assert_eq!(Encoder::PREFERENCE[0], Encoder::X264);
+    }
+
+    #[test]
+    fn keyframe_interval_assumes_the_idle_rate_not_the_nominal_one() {
+        // A still desktop measured ~11 fps against a nominal 60. Using 60 would
+        // put keyframes 10s apart, so this must not scale with the nominal rate.
+        assert_eq!(keyframe_interval_frames(60), 24);
+        assert_eq!(keyframe_interval_frames(30), 24);
+        // Below the idle assumption, the real rate is the limit.
+        assert_eq!(keyframe_interval_frames(10), 20);
+    }
+
+    #[test]
+    fn keyframe_interval_is_never_degenerate() {
+        for fps in [0, 1, 2, 5, 60, 240] {
+            assert!(keyframe_interval_frames(fps) >= 2, "fps {fps}");
+        }
     }
 }

@@ -59,11 +59,31 @@ Honest state of things, so nobody wastes an evening:
 |---|---|
 | Virtual monitor creation, teardown | **Working** — verified on GNOME 50.3 / mutter 50.3 |
 | Touch injection into the virtual monitor | **Working** — verified end to end |
+| Capture → H.264 encode | **Working** — captures the real desktop, output decodes cleanly |
 | Wire protocol, adb transport | **Working** — unit tested |
 | Adaptive bitrate control | **Working** — unit tested |
-| Video capture → encode → tablet | **Written, not yet run on hardware** |
-| Camera → `/dev/video10` | **Written, not yet run on hardware** |
+| Tablet-side decode and display | **Written, not yet run on a tablet** |
+| Camera → `/dev/video10` | **Written, not yet run on a tablet** |
 | Keyboard, stylus, audio, Wi-Fi | Not started — see [Roadmap](#roadmap) |
+
+You can verify the capture half yourself, with no tablet plugged in:
+
+```console
+$ cargo run -p xs-video --example capture_test
+creating a 1332x800@60 virtual monitor...
+  pipewire node 92
+  encoder: OpenH264 (software, fallback)
+
+capturing for 5s...
+--- results ---
+  first frame after   46 ms
+  frames              57
+  keyframes           3
+  measured rate       11.4 fps  (asked for 60)
+```
+
+It writes `/tmp/extraspace-capture.h264`, which `ffprobe` will confirm is
+Constrained Baseline 1332×800 that decodes without errors.
 
 If you try it and something breaks, an issue with `RUST_LOG=debug` output is very
 welcome.
@@ -181,6 +201,15 @@ Things that cost time, recorded so they cost you less:
 - **USB 2.0 is not the bottleneck.** Raw 2000×1200@60 would need ~550 MB/s, far
   beyond the ~30 MB/s a High Speed link gives you. Encoded H.264 at 15 Mbit/s is
   under 2 MB/s — roughly 15× headroom.
+- **"60 fps" is a ceiling, not a rate.** Mutter only emits a frame when something
+  on the monitor actually changes, so a still desktop measures around **11 fps**
+  and well under 1 Mbit/s. That is exactly what you want — an idle screen should
+  be nearly free — but it quietly breaks anything that reasons in frame counts.
+  Both encoders express their keyframe interval in frames, so the obvious
+  `framerate × 2` puts keyframes *ten seconds* apart while idle, and a tablet
+  that reconnects sits on a black screen until one arrives. The interval is sized
+  against the idle rate instead, and a keyframe is requested explicitly whenever a
+  tablet attaches.
 
 ## Troubleshooting
 

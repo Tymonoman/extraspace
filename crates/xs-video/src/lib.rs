@@ -6,11 +6,11 @@
 //! pipewiresrc -> videorate -> videoconvert -> <encoder> -> h264parse -> appsink
 //! ```
 //!
-//! `videorate` is not redundant with the virtual monitor's pinned refresh rate:
-//! mutter only sends frames when something actually changes, so a static desktop
-//! produces a very sparse stream. Some MediaCodec decoders stall waiting for input
-//! and only flush once the next frame arrives, which shows up as the tablet
-//! "sticking" on the last image. Forcing a steady cadence avoids that.
+//! `videorate` caps the stream at the configured rate; it does **not** pad it up
+//! to that rate. Mutter only emits a frame when something on the monitor actually
+//! changes, so a still desktop measures around 11 fps rather than 60. That is
+//! correct and desirable -- an idle screen costs almost no bandwidth -- but it
+//! means frame-count-based reasoning is unreliable: see the keyframe note below.
 //!
 //! Encoded frames leave through a bounded channel. If the transport cannot keep
 //! up, frames are dropped here rather than allowed to accumulate -- for a live

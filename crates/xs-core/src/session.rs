@@ -329,6 +329,11 @@ async fn connect(
         )
         .await?;
 
+    // The tablet cannot decode anything until it sees a keyframe, and on an idle
+    // desktop the next scheduled one can be seconds away. Ask for one now so the
+    // first image appears immediately rather than whenever the screen next changes.
+    pipeline.request_keyframe();
+
     if config.camera_enabled {
         send_camera_control(&control_writer, true, &config.camera_id).await?;
     }
